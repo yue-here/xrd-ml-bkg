@@ -1,5 +1,5 @@
 # CYCAD - CYCling Autocorrelation Dataviz
-# 1.0.0
+# 1.0.2
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,7 +56,7 @@ class cycad:
     # return str(int(filename.split('.')[-2].split('_')[-1]))
         return filename.split('-')[1].split('_')[0]
 
-    def read_folder(self, root, filetype):
+    def read_folder(self, root, filetype, range=None):
         '''
         Read a sorted list of files in a folder to `self.files`. The path is stored as `self.root`. The lowest level folder name is stored as `self.runname` and used as the run name.
 
@@ -68,11 +68,17 @@ class cycad:
         :type root: str
         :param filetype: Filetype of the files.
         :type filetype: str
+        :param range: Range of files to read. If None, all files are read.
+        :type range: tuple
         '''
         self.root = root
         self.runname = os.path.normpath(self.root).split(os.path.sep)[-1]
         self.filetype = filetype
-        self.files = self.natural_sort(glob.glob(self.root + '/*' + self.filetype))
+        if range:
+            self.files = self.natural_sort(glob.glob(self.root + '/*' + self.filetype))[range[0]:range[1]]
+        else:
+            self.files = self.natural_sort(glob.glob(self.root + '/*' + self.filetype))
+
         self.read_data()
 
     def read_data(self, parse_names=False):
@@ -89,16 +95,21 @@ class cycad:
         try:
             maxfiles = len(self.files)
 
+            # Define file categories
+            filetypes_csv = ['csv', 'txt', 'xy', 'xye', 'tsv', 'q']
+            filetypes_hdf = ['h5', 'hdf5']
+
             # Initialize dataframe with x column
             self.df = pd.DataFrame()
-            if self.filetype in ['h5', 'hdf5']:
+            if self.filetype in filetypes_hdf:
                 f = h5py.File(self.files[0])
                 def get_data(f):
                     return h5py.File(f)['I'][0]
                 self.df['x'] = f['2th']
 
 
-            elif self.filetype in ['csv', 'txt', 'xy', 'xye', 'tsv']:
+
+            elif self.filetype in filetypes_csv:
                 # Find csv delimiter
                 sniffer = csv.Sniffer()
                 with open(self.files[0], 'r') as sniff_file:
@@ -115,7 +126,7 @@ class cycad:
             for i in tqdm(range(maxfiles)):
 
                 # HDF type data formats
-                if self.filetype in ['h5', 'hdf5']:
+                if self.filetype in filetypes_hdf:
                     try:
                         # self.df[split_filename(self.files[i])] = h5py.File(self.files[i])['I'][0]
                         if parse_names:
@@ -127,7 +138,7 @@ class cycad:
                         _.append(pd.DataFrame(np.zeros(self.df.shape[0])+0.1, columns=[self.files[i]]))
 
                 # Delimited data formats
-                if self.filetype in ['csv', 'txt', 'xy', 'xye', 'tsv']:
+                if self.filetype in filetypes_csv:
                     try:
                         if parse_names:
                             temp = get_data(self.files[i])
@@ -475,4 +486,3 @@ class cycad:
             plt.close(fig)
         else:
             print('No data to plot!')
-    
